@@ -4,7 +4,7 @@ class FeedTests(unittest.TestCase):
     def test_live(self):
         r={"stale":False,"awarded":False,"status":{"type":"inprogress","period":"period2"},"homeScore":{"current":0,"periods":{"period1":20,"period2":10}},"awayScore":{"current":1,"periods":{"period1":25,"period2":15}}}
         self.assertEqual(decode(r,5),([1],(10,15),None))
-        self.assertIsNone(decode(r))
+        self.assertEqual(decode(r),([1],(10,15),None))
         r["homeScore"]["current"]=1
         self.assertIsNone(decode(r,5))
     def test_final(self):
