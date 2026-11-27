@@ -7,6 +7,7 @@ from volley_odds import prematch_record,stamp
 from volley_engine import process
 from volley_tracking import statistics
 import volley_coverage
+import volley_health
 from volley_telegram import Telegram
 
 def sports_headers():
@@ -53,6 +54,7 @@ def main():
                 print("Recovery HTTP",e.code)
             except (OSError,ValueError): print("Recovery unavailable")
     if not 8<=local.hour<23:
+        volley_health.daily(state,now,local,tg,persist)
         print("Outside live window",json.dumps(statistics(state)))
         return
     slot=now.strftime("%Y-%m-%dT%H:")+str(now.minute//15)
@@ -100,6 +102,7 @@ def main():
         fmt=row.get("matchFormat")
         best=fmt if type(fmt) is int and fmt in (3,5) else None
         records=list(state.get("odds",{}).values())
+        volley_health.observe(state,row,records,best,now)
         volley_coverage.observe(state,row,records,best,now)
         accepted+=bool(process(state,row,records,best,tg,persist))
         volley_coverage.observe(state,row,records,best,now)
