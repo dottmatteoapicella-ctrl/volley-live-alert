@@ -13,7 +13,7 @@ class MatchingTests(unittest.TestCase):
         row={"id":"moviodds:1","home":{"name":"A"},"away":{"name":"B"},"league":"League","startTime":"2026-11-27T18:00:00Z"}
         rec={"fixture_id":"moviodds:2","names":["a","b"],"league":"league","prices":{"a":1.2,"b":4},"start":row["startTime"],"captured":"2026-11-27T17:00:00Z"}
         self.assertEqual(shadow_matching_reason(row,[rec]),"unique_verified_candidate")
-        self.assertEqual(favorite_diagnostic(row,[rec]),(None,"missing_prematch_id"))
+        self.assertEqual(favorite_diagnostic(row,[rec]),({"favorite":0,"odds":[1.2,4]},"matched_verified_fallback"))
         self.assertEqual(shadow_matching_reason(row,[rec,rec]),"ambiguous_team_time")
         self.assertEqual(shadow_matching_reason(row,[dict(rec,league="")]),"candidate_league_unknown")
         self.assertEqual(shadow_matching_reason(row,[dict(rec,league="other")]),"candidate_league_mismatch")
