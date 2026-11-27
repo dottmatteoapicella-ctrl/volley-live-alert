@@ -27,7 +27,7 @@ def process(state,row,records,best_of,telegram,persist,allow_alerts=True):
     if favorite is None:
         return True
     idx=favorite["favorite"]
-    for strategy,number in signals(idx,completed,current,best_of):
+    for strategy,number in signals(idx,completed,current,best_of or 5):
         key=register(state,match_id,strategy,number,idx,teams,favorite["odds"][idx])
         if key is None:
             continue
