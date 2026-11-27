@@ -46,6 +46,10 @@ jobs:
           if pre:
               m=pre[0]
               print("Match fields:",sorted(m.keys()))
+              print("Sample match:",json.dumps({k:m.get(k) for k in ("home","away","kickoff_utc","stale","in_play","polled_at")}))
+              for q in (m.get("quotes") or []):
+                  if isinstance(q,dict) and q.get("group_name")=="Winner":
+                      print("Winner sample:",json.dumps({k:q.get(k) for k in ("side","phase","suspended","odds_dec","ts","group_id")}))
               for q in (m.get("quotes") or [])[:3]:
                   if isinstance(q,dict):
                       print("Quote fields:",sorted(q.keys()))
