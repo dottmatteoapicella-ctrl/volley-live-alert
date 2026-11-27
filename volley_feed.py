@@ -9,6 +9,17 @@ def decode(row,best_of=None):
     if kind not in ("inprogress","finished"):
         return None
     if best_of not in (3,5):
+        candidates=[decode(row,b) for b in (3,5)]
+        valid=[x for x in candidates if x is not None]
+        if not valid: return None
+        if len(valid)==1:
+            # A third-set score alone cannot establish the match format.
+            if kind=="inprogress" and sum((row.get(k) or {}).get("current",0) for k in ("homeScore","awayScore"))==2:
+                return valid[0][0],None,None
+            return valid[0]
+        if valid[0]==valid[1]: return valid[0]
+        if valid[0][0]==valid[1][0] and valid[0][2]==valid[1][2]:
+            return valid[0][0],None,valid[0][2]
         return None
     scores=[row.get(k) or {} for k in ("homeScore","awayScore")]
     totals=[s.get("current") for s in scores]
