@@ -2,7 +2,7 @@ import os,json,urllib.request,urllib.error
 from datetime import datetime,timezone
 from zoneinfo import ZoneInfo
 from volley_state import load,save
-from volley_odds import prematch_record,stamp,favorite_diagnostic,shadow_matching_reason
+from volley_odds import prematch_diagnostic,stamp,favorite_diagnostic,shadow_matching_reason
 from volley_engine import process
 from volley_tracking import statistics
 from volley_moviodds import adapt,reserve
@@ -49,6 +49,7 @@ def main():
         data=request("results",now.strftime("%Y-%m-%d:")+str(now.hour//3),"/results?sport=volleyball")
         rows=data.get("results",[]) if isinstance(data,dict) else []
         if isinstance(rows,list):
+            rejected={}
             for m in rows:
                 if not isinstance(m,dict) or "moviodds:"+str(m.get("fixture_id")) not in pending: continue
                 a=adapt(m,now,True)
@@ -64,12 +65,13 @@ def main():
                 if not isinstance(m,dict) or m.get("id") is None:
                     counts["invalid_row"]+=1
                     continue
-                rec=prematch_record(m,now)
+                rec,why=prematch_diagnostic(m,now)
                 if rec:
                     cache[str(m["id"])]=rec
                     counts["prematch_accepted"]+=1
                 elif m.get("in_play") is False:
                     counts["prematch_rejected"]+=1
+                    rejected[why]=rejected.get(why,0)+1
             state["odds"]={k:v for k,v in cache.items() if stamp(v.get("start")) and (now-stamp(v["start"])).total_seconds()<259200}
             persist()
             accepted=0
@@ -94,6 +96,7 @@ def main():
                 volley_coverage.observe(state,row,records,best,now)
                 accepted+=bool(process(state,row,records,best,tg,persist))
                 volley_coverage.observe(state,row,records,best,now)
+            print("VOLLEY_PREMATCH_REJECTIONS",json.dumps(rejected,sort_keys=True))
             print("VOLLEY_CYCLE_REPORT",json.dumps(counts,sort_keys=True))
             print("VOLLEY_MATCHING_REPORT",json.dumps(diagnostics,sort_keys=True))
             print("VOLLEY_SHADOW_MATCHING",json.dumps(shadow,sort_keys=True))
