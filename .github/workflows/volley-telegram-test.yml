@@ -1,0 +1,27 @@
+name: Volley Telegram Test
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  telegram:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Send test notification
+        run: |
+          python - <<'PY'
+          import os
+          from volley_telegram import Telegram
+          token=os.environ.get("TELEGRAM_BOT_TOKEN")
+          chat=os.environ.get("TELEGRAM_CHAT_ID")
+          if not token or not chat:
+              raise SystemExit("Telegram secrets missing")
+          if not Telegram(token,chat).send("🏐 Bot Volley — test Telegram. Nessuna scommessa o partita reale."):
+              raise SystemExit("Telegram delivery not confirmed")
+          print("Telegram delivery confirmed")
+          PY
