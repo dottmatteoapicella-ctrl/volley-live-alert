@@ -1,0 +1,52 @@
+name: Volley Odds Probe
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    env:
+      MOVIODDS_API_KEY: ${{ secrets.MOVIODDS_API_KEY }}
+    steps:
+      - name: Inspect volleyball odds
+        run: |
+          python - <<'PY'
+          import os, json, urllib.request, urllib.error
+          key = os.environ.get("MOVIODDS_API_KEY")
+          if not key:
+              raise SystemExit("MOVIODDS_API_KEY missing")
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, *args, **kwargs):
+                  return None
+          req = urllib.request.Request("https://moviodds.com/odds?sport=volleyball", headers={"X-API-Key":key,"Accept":"application/json"})
+          try:
+              with urllib.request.build_opener(NoRedirect()).open(req, timeout=30) as res:
+                  print("HTTP", res.status)
+                  for k,v in res.headers.items():
+                      if "ratelimit" in k.lower() and v.isdigit():
+                          print(k,v)
+                  payload=json.load(res)
+          except urllib.error.HTTPError as e:
+              raise SystemExit("HTTP "+str(e.code))
+          matches=payload.get("matches") if isinstance(payload,dict) else None
+          if not isinstance(matches,list):
+              raise SystemExit("Unexpected response structure")
+          print("Matches:",len(matches))
+          pre=[m for m in matches if isinstance(m,dict) and m.get("in_play") is False]
+          print("Prematch:",len(pre))
+          groups={}
+          for m in pre:
+              for q in m.get("quotes") or []:
+                  if isinstance(q,dict):
+                      name=str(q.get("group_name") or "")[:100]
+                      groups[name]=groups.get(name,0)+1
+          print("Prematch markets:",json.dumps(groups,ensure_ascii=True))
+          if pre:
+              m=pre[0]
+              print("Match fields:",sorted(m.keys()))
+              for q in (m.get("quotes") or [])[:3]:
+                  if isinstance(q,dict):
+                      print("Quote fields:",sorted(q.keys()))
+          PY
