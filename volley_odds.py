@@ -72,7 +72,9 @@ def favorite_diagnostic(fixture,records):
         result=legacy_favorite_for(fixture,records)
         return result,"legacy_matched" if result else "legacy_unmatched"
     exact=[r for r in records if r.get("fixture_id")==mid]
-    if not exact: return None,"missing_prematch_id"
+    if not exact:
+        result,reason=verified_fallback(fixture,records)
+        return (result,"matched_verified_fallback") if result else (None,"missing_prematch_id")
     if len(exact)!=1: return None,"duplicate_id"
     r=exact[0]
     names=[name_key((fixture.get(k) or {}).get("name")) for k in ("home","away")]
@@ -93,17 +95,17 @@ def favorite_diagnostic(fixture,records):
 def favorite_for(fixture,records):
     return favorite_diagnostic(fixture,records)[0]
 
-def shadow_matching_reason(fixture,records):
-    """Diagnostic only: never supplies odds to an alert."""
+def verified_fallback(fixture,records):
+    """Strict fallback only for missing IDs; no fuzzy names."""
     mid=str(fixture.get("id",""))
     names=[name_key((fixture.get(k) or {}).get("name")) for k in ("home","away")]
     start=stamp(fixture.get("startTime"))
     league=name_key(fixture.get("league"))
     if not start or not all(names) or names[0]==names[1]:
-        return "missing_live_identity"
+        return None,"missing_live_identity"
     pairs=[r for r in records if r.get("fixture_id")!=mid and set(r.get("names",[]))==set(names)]
     if not pairs:
-        return "no_cached_team_pair"
+        return None,"no_cached_team_pair"
     timed=[]
     for r in pairs:
         kickoff=stamp(r.get("start"))
@@ -111,14 +113,18 @@ def shadow_matching_reason(fixture,records):
         if kickoff and captured and captured<min(start,kickoff) and abs((kickoff-start).total_seconds())<=1800:
             timed.append(r)
     if not timed:
-        return "no_valid_prematch_time"
+        return None,"no_valid_prematch_time"
     if len(timed)!=1:
-        return "ambiguous_team_time"
+        return None,"ambiguous_team_time"
     r=timed[0]
     if not league or not r.get("league"):
-        return "candidate_league_unknown"
+        return None,"candidate_league_unknown"
     if r["league"]!=league:
-        return "candidate_league_mismatch"
+        return None,"candidate_league_mismatch"
     candidate=dict(r,fixture_id=mid)
     result,reason=favorite_diagnostic(fixture,[candidate])
-    return "unique_verified_candidate" if result else "candidate_"+reason
+    return (result,"unique_verified_candidate") if result else (None,"candidate_"+reason)
+
+
+def shadow_matching_reason(fixture,records):
+    return verified_fallback(fixture,records)[1]
