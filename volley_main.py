@@ -49,7 +49,6 @@ def main():
         data=request("results",now.strftime("%Y-%m-%d:")+str(now.hour//3),"/results?sport=volleyball")
         rows=data.get("results",[]) if isinstance(data,dict) else []
         if isinstance(rows,list):
-            rejected={}
             for m in rows:
                 if not isinstance(m,dict) or "moviodds:"+str(m.get("fixture_id")) not in pending: continue
                 a=adapt(m,now,True)
@@ -59,6 +58,7 @@ def main():
         rows=data.get("matches",[]) if isinstance(data,dict) else []
         print("VOLLEY_RESPONSE", "no_payload" if data is None else "matches_list" if isinstance(data,dict) and isinstance(data.get("matches"),list) else "unexpected_schema")
         if isinstance(rows,list):
+            rejected={}
             cache=state.setdefault("odds",{})
             counts={"invalid_row":0,"prematch_accepted":0,"prematch_rejected":0,"live_seen":0,"live_rejected":0,"live_adapted":0}
             for m in rows:
