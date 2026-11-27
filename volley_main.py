@@ -6,6 +6,7 @@ from volley_strategy import reserve
 from volley_odds import prematch_record,stamp
 from volley_engine import process
 from volley_tracking import statistics
+import volley_coverage
 from volley_telegram import Telegram
 
 def get(url,headers):
@@ -50,7 +51,11 @@ def main():
     slot=now.strftime("%Y-%m-%dT%H:")+str(now.minute//15)
     if state.get("live_slot")==slot: return
     state["live_slot"]=slot
-    if not reserve(budget,now.date().isoformat(),"live"): return
+    if not reserve(budget,now.date().isoformat(),"live"):
+        print("Live skipped: budget or provider block",json.dumps(budget))
+        volley_coverage.report(state,now)
+        persist()
+        return
     persist()
     try:
         payload=get("https://api.sportsapi.app/v2/livescores?sport=volleyball",{"Authorization":"Bearer "+os.environ["SPORTSAPI_KEY"]})
@@ -85,7 +90,12 @@ def main():
         # Only explicit verified format values; unknown formats are skipped.
         fmt=row.get("matchFormat")
         best=fmt if type(fmt) is int and fmt in (3,5) else None
-        accepted+=bool(process(state,row,list(state.get("odds",{}).values()),best,tg,persist))
+        records=list(state.get("odds",{}).values())
+        volley_coverage.observe(state,row,records,best,now)
+        accepted+=bool(process(state,row,records,best,tg,persist))
+        volley_coverage.observe(state,row,records,best,now)
+    volley_coverage.report(state,now)
+    persist()
     print("Live rows",len(rows),"decoded",accepted,"cached odds",len(state.get("odds",{})))
     print("Budget",json.dumps(budget))
     print("Statistics",json.dumps(statistics(state)))
