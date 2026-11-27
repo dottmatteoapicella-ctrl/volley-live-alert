@@ -14,16 +14,16 @@ def stamp(value):
     except (ValueError,TypeError,AttributeError):
         return None
 
-def prematch_record(match,now):
+def prematch_diagnostic(match,now):
     if match.get("in_play") is not False or match.get("stale") not in (None,False):
-        return None
+        return None,"not_prematch_or_stale"
     start=stamp(match.get("kickoff_utc"))
     polled=stamp(match.get("polled_at"))
     if match.get("stale") is None and (not polled or not 0 <= (now-polled).total_seconds() <= 900):
-        return None
+        return None,"missing_or_stale_poll"
     names=[name_key(match.get(k)) for k in ("home","away")]
     if not start or start<=now+timedelta(minutes=5) or not all(names) or names[0]==names[1]:
-        return None
+        return None,"invalid_identity_or_kickoff"
     prices={}
     for q in match.get("quotes") or []:
         if not isinstance(q,dict) or str(q.get("group_name","")).casefold()!="winner":
@@ -41,11 +41,14 @@ def prematch_record(match,now):
         if not math.isfinite(price) or price<=1:
             continue
         if side in prices and prices[side]!=price:
-            return None
+            return None,"conflicting_prices"
         prices[side]=price
     if len(prices)!=2 or prices[names[0]]==prices[names[1]]:
-        return None
-    return {"names":names,"prices":prices,"start":start.isoformat(),"captured":now.isoformat(),"league":name_key(match.get("league"))}
+        return None,"missing_or_equal_prices"
+    return {"names":names,"prices":prices,"start":start.isoformat(),"captured":now.isoformat(),"league":name_key(match.get("league"))},"accepted"
+
+def prematch_record(match,now):
+    return prematch_diagnostic(match,now)[0]
 
 def legacy_favorite_for(fixture,records):
     start=stamp(fixture.get("startTime"))
