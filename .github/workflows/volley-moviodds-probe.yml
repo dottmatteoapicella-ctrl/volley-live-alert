@@ -1,0 +1,48 @@
+name: Volley MoviOdds Probe
+on:
+  workflow_dispatch:
+    inputs:
+      endpoint:
+        type: choice
+        options:
+          - live
+          - results
+        default: live
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    env:
+      MOVIODDS_API_KEY: ${{ secrets.MOVIODDS_API_KEY }}
+      ENDPOINT: ${{ inputs.endpoint }}
+    steps:
+      - name: Inspect volleyball scores with one request
+        run: |
+          python - <<'PY'
+          import os, json, urllib.request, urllib.error
+          key = os.environ["MOVIODDS_API_KEY"].strip()
+          if not key:
+              raise SystemExit("Missing key")
+          live = os.environ["ENDPOINT"] == "live"
+          path = "/odds?sport=volleyball&in_play=1&stats=1" if live else "/results?sport=volleyball"
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, *args, **kwargs):
+                  return None
+          req = urllib.request.Request("https://moviodds.com"+path, headers={"X-API-Key":key,"Accept":"application/json"})
+          try:
+              with urllib.request.build_opener(NoRedirect).open(req, timeout=25) as res:
+                  print("HTTP", res.status)
+                  for k,v in res.headers.items():
+                      if "ratelimit" in k.lower() and v.isdigit(): print(k,v)
+                  data=json.load(res)
+          except urllib.error.HTTPError as e:
+              raise SystemExit("HTTP "+str(e.code))
+          rows=data.get("matches" if live else "results", [])
+          print("Rows",len(rows))
+          for row in rows[:12]:
+              fields=("id","fixture_id","home","away","league","score","final_score","periods","status","in_play","polled_at","last_live_seen","finished_at","clock")
+              print(json.dumps({k:row[k] for k in fields if k in row},ensure_ascii=True))
+              if isinstance(row.get("stats"),dict): print("stats keys",sorted(row["stats"]))
+          PY
