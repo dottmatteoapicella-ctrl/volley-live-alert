@@ -47,7 +47,7 @@ def prematch_record(match,now):
         return None
     return {"names":names,"prices":prices,"start":start.isoformat(),"captured":now.isoformat()}
 
-def favorite_for(fixture,records):
+def legacy_favorite_for(fixture,records):
     start=stamp(fixture.get("startTime"))
     names=[name_key((fixture.get(k) or {}).get("name")) for k in ("home","away")]
     if not start or not all(names) or names[0]==names[1]:
@@ -65,3 +65,30 @@ def favorite_for(fixture,records):
         return None
     prices=candidates[0]["prices"]
     return {"favorite":int(prices[names[1]]<prices[names[0]]),"odds":[prices[n] for n in names]}
+
+def favorite_diagnostic(fixture,records):
+    mid=str(fixture.get("id",""))
+    if not mid.startswith("moviodds:"):
+        result=legacy_favorite_for(fixture,records)
+        return result,"legacy_matched" if result else "legacy_unmatched"
+    exact=[r for r in records if r.get("fixture_id")==mid]
+    if not exact: return None,"missing_prematch_id"
+    if len(exact)!=1: return None,"duplicate_id"
+    r=exact[0]
+    names=[name_key((fixture.get(k) or {}).get("name")) for k in ("home","away")]
+    if not all(names) or names[0]==names[1] or set(names)!=set(r.get("names",[])):
+        return None,"team_mismatch"
+    start=stamp(fixture.get("startTime"))
+    kickoff=stamp(r.get("start"))
+    captured=stamp(r.get("captured"))
+    if not start or not kickoff or not captured: return None,"missing_timestamp"
+    if captured>=min(start,kickoff): return None,"not_prematch"
+    if abs((kickoff-start).total_seconds())>3600: return None,"kickoff_mismatch"
+    try: prices=[r["prices"][n] for n in names]
+    except (KeyError,TypeError): return None,"invalid_prices"
+    if any(type(x) not in (int,float) or not math.isfinite(x) or x<=1 for x in prices) or prices[0]==prices[1]:
+        return None,"invalid_prices"
+    return {"favorite":int(prices[1]<prices[0]),"odds":prices},"matched_id"
+
+def favorite_for(fixture,records):
+    return favorite_diagnostic(fixture,records)[0]
