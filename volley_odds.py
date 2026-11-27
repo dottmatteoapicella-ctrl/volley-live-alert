@@ -15,9 +15,12 @@ def stamp(value):
         return None
 
 def prematch_record(match,now):
-    if match.get("in_play") is not False or match.get("stale") is not False:
+    if match.get("in_play") is not False or match.get("stale") not in (None,False):
         return None
     start=stamp(match.get("kickoff_utc"))
+    polled=stamp(match.get("polled_at"))
+    if match.get("stale") is None and (not polled or not 0 <= (now-polled).total_seconds() <= 900):
+        return None
     names=[name_key(match.get(k)) for k in ("home","away")]
     if not start or start<=now+timedelta(minutes=5) or not all(names) or names[0]==names[1]:
         return None
@@ -25,7 +28,10 @@ def prematch_record(match,now):
     for q in match.get("quotes") or []:
         if not isinstance(q,dict) or str(q.get("group_name","")).casefold()!="winner":
             continue
-        if q.get("suspended") is not False or str(q.get("phase","")).casefold()=="inplay":
+        if q.get("suspended") not in (None,False) or str(q.get("phase","")).casefold()=="inplay":
+            continue
+        ts=stamp(q.get("ts"))
+        if q.get("suspended") is None and (not ts or not 0 <= (now-ts).total_seconds() <= 7200 or ts>=start):
             continue
         side=name_key(q.get("side"))
         if side not in names:
