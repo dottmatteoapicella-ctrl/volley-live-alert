@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 def name_key(value):
     if not isinstance(value,str):
         return ""
-    return "".join(c for c in unicodedata.normalize("NFKD",value.casefold()) if c.isalnum())
+    return "".join(c for c in unicodedata.normalize("NFKD",value).casefold() if c.isalnum())
 
 def stamp(value):
     try:
