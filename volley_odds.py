@@ -45,7 +45,7 @@ def prematch_record(match,now):
         prices[side]=price
     if len(prices)!=2 or prices[names[0]]==prices[names[1]]:
         return None
-    return {"names":names,"prices":prices,"start":start.isoformat(),"captured":now.isoformat()}
+    return {"names":names,"prices":prices,"start":start.isoformat(),"captured":now.isoformat(),"league":name_key(match.get("league"))}
 
 def legacy_favorite_for(fixture,records):
     start=stamp(fixture.get("startTime"))
@@ -92,3 +92,33 @@ def favorite_diagnostic(fixture,records):
 
 def favorite_for(fixture,records):
     return favorite_diagnostic(fixture,records)[0]
+
+def shadow_matching_reason(fixture,records):
+    """Diagnostic only: never supplies odds to an alert."""
+    mid=str(fixture.get("id",""))
+    names=[name_key((fixture.get(k) or {}).get("name")) for k in ("home","away")]
+    start=stamp(fixture.get("startTime"))
+    league=name_key(fixture.get("league"))
+    if not start or not all(names) or names[0]==names[1]:
+        return "missing_live_identity"
+    pairs=[r for r in records if r.get("fixture_id")!=mid and set(r.get("names",[]))==set(names)]
+    if not pairs:
+        return "no_cached_team_pair"
+    timed=[]
+    for r in pairs:
+        kickoff=stamp(r.get("start"))
+        captured=stamp(r.get("captured"))
+        if kickoff and captured and captured<min(start,kickoff) and abs((kickoff-start).total_seconds())<=1800:
+            timed.append(r)
+    if not timed:
+        return "no_valid_prematch_time"
+    if len(timed)!=1:
+        return "ambiguous_team_time"
+    r=timed[0]
+    if not league or not r.get("league"):
+        return "candidate_league_unknown"
+    if r["league"]!=league:
+        return "candidate_league_mismatch"
+    candidate=dict(r,fixture_id=mid)
+    result,reason=favorite_diagnostic(fixture,[candidate])
+    return "unique_verified_candidate" if result else "candidate_"+reason
