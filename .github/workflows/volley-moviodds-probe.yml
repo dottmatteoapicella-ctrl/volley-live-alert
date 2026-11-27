@@ -1,13 +1,6 @@
-name: Volley MoviOdds Probe
+name: Volley MoviOdds Results Probe
 on:
   workflow_dispatch:
-    inputs:
-      endpoint:
-        type: choice
-        options:
-          - live
-          - results
-        default: live
 permissions:
   contents: read
 jobs:
@@ -16,7 +9,7 @@ jobs:
     timeout-minutes: 2
     env:
       MOVIODDS_API_KEY: ${{ secrets.MOVIODDS_API_KEY }}
-      ENDPOINT: ${{ inputs.endpoint }}
+      ENDPOINT: results
     steps:
       - name: Inspect volleyball scores with one request
         run: |
