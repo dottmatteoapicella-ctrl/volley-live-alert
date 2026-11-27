@@ -30,7 +30,12 @@ def main():
     tg=Telegram(token,os.environ["TELEGRAM_CHAT_ID"])
     def request(kind,slot,path):
         key="moviodds_"+kind+"_slot"
-        if state.get(key)==slot or not reserve(budget,now,kind): return None
+        if state.get(key)==slot:
+            print("VOLLEY_REQUEST",kind,"skipped_slot")
+            return None
+        if not reserve(budget,now,kind):
+            print("VOLLEY_REQUEST",kind,"skipped_budget")
+            return None
         state[key]=slot
         persist()
         try: return get(path)
@@ -51,20 +56,33 @@ def main():
     if 8<=local.hour<23:
         data=request("live",now.strftime("%Y-%m-%dT%H:")+str(now.minute//30),"/odds?sport=volleyball&stats=1")
         rows=data.get("matches",[]) if isinstance(data,dict) else []
+        print("VOLLEY_RESPONSE", "no_payload" if data is None else "matches_list" if isinstance(data,dict) and isinstance(data.get("matches"),list) else "unexpected_schema")
         if isinstance(rows,list):
             cache=state.setdefault("odds",{})
+            counts={"invalid_row":0,"prematch_accepted":0,"prematch_rejected":0,"live_seen":0,"live_rejected":0,"live_adapted":0}
             for m in rows:
-                if not isinstance(m,dict) or m.get("id") is None: continue
+                if not isinstance(m,dict) or m.get("id") is None:
+                    counts["invalid_row"]+=1
+                    continue
                 rec=prematch_record(m,now)
-                if rec: cache[str(m["id"])]=rec
+                if rec:
+                    cache[str(m["id"])]=rec
+                    counts["prematch_accepted"]+=1
+                elif m.get("in_play") is False:
+                    counts["prematch_rejected"]+=1
             state["odds"]={k:v for k,v in cache.items() if stamp(v.get("start")) and (now-stamp(v["start"])).total_seconds()<259200}
             persist()
             accepted=0
             diagnostics={}
             records=[dict(v,fixture_id="moviodds:"+str(k)) for k,v in state["odds"].items()]
             for m in rows:
+                is_live=isinstance(m,dict) and m.get("in_play") is True
+                if is_live: counts["live_seen"]+=1
                 a=adapt(m,now)
-                if not a: continue
+                if not a:
+                    if is_live: counts["live_rejected"]+=1
+                    continue
+                counts["live_adapted"]+=1
                 row,best=a
                 _,reason=favorite_diagnostic(row,records)
                 diagnostics[reason]=diagnostics.get(reason,0)+1
@@ -72,6 +90,7 @@ def main():
                 volley_coverage.observe(state,row,records,best,now)
                 accepted+=bool(process(state,row,records,best,tg,persist))
                 volley_coverage.observe(state,row,records,best,now)
+            print("VOLLEY_CYCLE_REPORT",json.dumps(counts,sort_keys=True))
             print("VOLLEY_MATCHING_REPORT",json.dumps(diagnostics,sort_keys=True))
             print("MoviOdds rows",len(rows),"decoded",accepted,"cached odds",len(state["odds"]))
     volley_health.daily(state,now,local,tg,persist)
