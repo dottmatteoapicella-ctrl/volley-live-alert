@@ -9,10 +9,17 @@ from volley_tracking import statistics
 import volley_coverage
 from volley_telegram import Telegram
 
+def sports_headers():
+    return {"Authorization":"Bearer "+os.environ["SPORTSAPI_KEY"].strip(),"Accept":"application/json"}
+
 def get(url,headers):
     class NoRedirect(urllib.request.HTTPRedirectHandler):
         def redirect_request(self,*args,**kwargs): return None
     with urllib.request.build_opener(NoRedirect()).open(urllib.request.Request(url,headers=headers),timeout=25) as res:
+        if url.startswith("https://api.sportsapi.app/"):
+            print("SportsAPI HTTP",res.status)
+            for k,v in res.headers.items():
+                if "ratelimit" in k.lower() and str(v).isdigit(): print(k,v)
         return json.load(res)
 
 def main():
@@ -36,7 +43,7 @@ def main():
         persist()
         if mid.isdigit():
             try:
-                detail=get("https://api.sportsapi.app/v2/fixtures/"+mid,{"Authorization":"Bearer "+os.environ["SPORTSAPI_KEY"]})
+                detail=get("https://api.sportsapi.app/v2/fixtures/"+mid,sports_headers())
                 row=detail.get("data") if isinstance(detail,dict) else None
                 if isinstance(row,dict) and str(row.get("id"))==mid:
                     fmt=row.get("matchFormat")
@@ -58,10 +65,12 @@ def main():
         return
     persist()
     try:
-        payload=get("https://api.sportsapi.app/v2/livescores?sport=volleyball",{"Authorization":"Bearer "+os.environ["SPORTSAPI_KEY"]})
+        payload=get("https://api.sportsapi.app/v2/livescores?sport=volleyball",sports_headers())
     except urllib.error.HTTPError as e:
         if e.code in (401,403,429): budget["blocked"]=True; persist()
         print("SportsAPI HTTP",e.code)
+        for k,v in (e.headers or {}).items():
+            if ("ratelimit" in k.lower() or k.lower()=="retry-after") and str(v).isdigit(): print(k,v)
         return
     except (OSError,ValueError):
         print("SportsAPI unavailable"); return
