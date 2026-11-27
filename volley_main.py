@@ -24,8 +24,28 @@ def main():
     persist()
     budget=state.setdefault("budget",{})
     local=now.astimezone(ZoneInfo("Europe/Rome"))
+    tg=Telegram(token,chat)
+    pending=sorted({r["match_id"] for r in state.get("alerts",{}).values() if r.get("message_id") and (r["result"] is None or not r.get("edited"))})
+    recovery_slot=now.strftime("%Y-%m-%dT%H:")+str(now.minute//30)
+    if pending and state.get("recovery_slot")!=recovery_slot and reserve(budget,now.date().isoformat(),"results"):
+        state["recovery_slot"]=recovery_slot
+        cursor=state.get("recovery_cursor",0)
+        mid=pending[cursor%len(pending)]
+        state["recovery_cursor"]=cursor+1
+        persist()
+        if mid.isdigit():
+            try:
+                detail=get("https://api.sportsapi.app/v2/fixtures/"+mid,{"Authorization":"Bearer "+os.environ["SPORTSAPI_KEY"]})
+                row=detail.get("data") if isinstance(detail,dict) else None
+                if isinstance(row,dict) and str(row.get("id"))==mid:
+                    fmt=row.get("matchFormat")
+                    process(state,row,[],fmt if type(fmt) is int and fmt in (3,5) else None,tg,persist,False)
+            except urllib.error.HTTPError as e:
+                if e.code in (401,403,429): budget["blocked"]=True; persist()
+                print("Recovery HTTP",e.code)
+            except (OSError,ValueError): print("Recovery unavailable")
     if not 8<=local.hour<23:
-        print("Outside live window")
+        print("Outside live window",json.dumps(statistics(state)))
         return
     slot=now.strftime("%Y-%m-%dT%H:")+str(now.minute//15)
     if state.get("live_slot")==slot: return
