@@ -2,7 +2,7 @@ import os,json,urllib.request,urllib.error
 from datetime import datetime,timezone
 from zoneinfo import ZoneInfo
 from volley_state import load,save
-from volley_odds import prematch_record,stamp,favorite_diagnostic
+from volley_odds import prematch_record,stamp,favorite_diagnostic,shadow_matching_reason
 from volley_engine import process
 from volley_tracking import statistics
 from volley_moviodds import adapt,reserve
@@ -74,6 +74,7 @@ def main():
             persist()
             accepted=0
             diagnostics={}
+            shadow={}
             records=[dict(v,fixture_id="moviodds:"+str(k)) for k,v in state["odds"].items()]
             for m in rows:
                 is_live=isinstance(m,dict) and m.get("in_play") is True
@@ -86,12 +87,16 @@ def main():
                 row,best=a
                 _,reason=favorite_diagnostic(row,records)
                 diagnostics[reason]=diagnostics.get(reason,0)+1
+                if reason=="missing_prematch_id":
+                    sr=shadow_matching_reason(row,records)
+                    shadow[sr]=shadow.get(sr,0)+1
                 volley_health.observe(state,row,records,best,now)
                 volley_coverage.observe(state,row,records,best,now)
                 accepted+=bool(process(state,row,records,best,tg,persist))
                 volley_coverage.observe(state,row,records,best,now)
             print("VOLLEY_CYCLE_REPORT",json.dumps(counts,sort_keys=True))
             print("VOLLEY_MATCHING_REPORT",json.dumps(diagnostics,sort_keys=True))
+            print("VOLLEY_SHADOW_MATCHING",json.dumps(shadow,sort_keys=True))
             print("MoviOdds rows",len(rows),"decoded",accepted,"cached odds",len(state["odds"]))
     volley_health.daily(state,now,local,tg,persist)
     volley_coverage.report(state,now)
