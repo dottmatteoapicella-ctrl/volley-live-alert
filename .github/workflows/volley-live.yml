@@ -5,7 +5,7 @@ on:
       initialize:
         description: Initialize only on the first run, never after cache loss
         type: boolean
-        default: false
+        default: true
 permissions:
   contents: read
 concurrency:
