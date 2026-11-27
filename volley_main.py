@@ -2,7 +2,7 @@ import os,json,urllib.request,urllib.error
 from datetime import datetime,timezone
 from zoneinfo import ZoneInfo
 from volley_state import load,save
-from volley_odds import prematch_record,stamp
+from volley_odds import prematch_record,stamp,favorite_diagnostic
 from volley_engine import process
 from volley_tracking import statistics
 from volley_moviodds import adapt,reserve
@@ -60,15 +60,19 @@ def main():
             state["odds"]={k:v for k,v in cache.items() if stamp(v.get("start")) and (now-stamp(v["start"])).total_seconds()<259200}
             persist()
             accepted=0
+            diagnostics={}
+            records=[dict(v,fixture_id="moviodds:"+str(k)) for k,v in state["odds"].items()]
             for m in rows:
                 a=adapt(m,now)
                 if not a: continue
                 row,best=a
-                records=list(state["odds"].values())
+                _,reason=favorite_diagnostic(row,records)
+                diagnostics[reason]=diagnostics.get(reason,0)+1
                 volley_health.observe(state,row,records,best,now)
                 volley_coverage.observe(state,row,records,best,now)
                 accepted+=bool(process(state,row,records,best,tg,persist))
                 volley_coverage.observe(state,row,records,best,now)
+            print("VOLLEY_MATCHING_REPORT",json.dumps(diagnostics,sort_keys=True))
             print("MoviOdds rows",len(rows),"decoded",accepted,"cached odds",len(state["odds"]))
     volley_health.daily(state,now,local,tg,persist)
     volley_coverage.report(state,now)
