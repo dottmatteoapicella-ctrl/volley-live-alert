@@ -18,7 +18,8 @@ def observe(state,row,records,best,now):
     completed,current,_=parsed
     keys=set(m.get("hypothetical",[]))
     for side in (0,1):
-        for strategy,n in signals(side,completed,current,best or 5):
+        candidates = set(signals(side,completed,current,best)) if best in (3,5) else set(signals(side,completed,current,3)) & set(signals(side,completed,current,5))
+        for strategy,n in candidates:
             keys.add(f"{side}:{strategy}:{n}")
     m["hypothetical"]=sorted(keys)
 
