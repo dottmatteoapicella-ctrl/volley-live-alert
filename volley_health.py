@@ -26,7 +26,7 @@ def observe(state,row,records,best,now):
 def summary(state,now):
     d=state.get("health",{})
     matches=d.get("matches",{}) if d.get("day")==now.date().isoformat() else {}
-    budget=state.get("budget",{})
+    budget=state.get("moviodds_budget",{})
     if budget.get("day")!=now.date().isoformat(): budget={}
     alerts=[a for a in state.get("alerts",{}).values() if a.get("message_id")]
     return ("🏐 Volley — diagnostica giornaliera (UTC)\n"
@@ -35,7 +35,7 @@ def summary(state,now):
             f"Favorite associate: {sum(bool(m.get('favorite')) for m in matches.values())}\n"
             f"Partite con condizioni ipotetiche senza favorita: {sum(bool(m.get('hypothetical')) for m in matches.values())}\n"
             f"Alert storici: {len(alerts)} | Esiti verificati: {sum(type(a.get('result')) is bool for a in alerts)}\n"
-            f"Budget interno: {budget.get('live',0)+budget.get('results',0)}/90\n"
+            f"Budget interno: {budget.get('live',0)+budget.get('results',0)}/38\n"
             f"Blocco provider: {'SI' if budget.get('blocked') else 'NO'}")
 
 def daily(state,now,local,tg,persist):

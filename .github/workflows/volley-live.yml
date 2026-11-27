@@ -16,7 +16,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
-      SPORTSAPI_KEY: ${{ secrets.SPORTSAPI_KEY }}
       MOVIODDS_API_KEY: ${{ secrets.MOVIODDS_API_KEY }}
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
