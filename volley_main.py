@@ -9,10 +9,13 @@ from volley_moviodds import adapt,reserve
 import volley_coverage,volley_health
 from volley_telegram import Telegram
 
+def moviodds_headers():
+    return {"X-API-Key":os.environ["MOVIODDS_API_KEY"].strip(),"Accept":"application/json"}
+
 def get(path):
     class NoRedirect(urllib.request.HTTPRedirectHandler):
         def redirect_request(self,*args,**kwargs): return None
-    req=urllib.request.Request("https://moviodds.com"+path,headers={"X-API-Key":os.environ["MOVIODDS_API_KEY"].strip(),"Accept":"application/json"})
+    req=urllib.request.Request("https://moviodds.com"+path,headers=moviodds_headers())
     with urllib.request.build_opener(NoRedirect()).open(req,timeout=25) as res:
         print("MoviOdds HTTP",res.status)
         return json.load(res)
