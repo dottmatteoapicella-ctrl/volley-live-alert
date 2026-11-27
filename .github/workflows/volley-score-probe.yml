@@ -1,0 +1,30 @@
+name: Volley Score Probe
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    env:
+      SPORTSAPI_KEY: ${{ secrets.SPORTSAPI_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          python - <<'PY'
+          import os,json,urllib.request,urllib.error
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self,*args,**kwargs): return None
+          req=urllib.request.Request("https://api.sportsapi.app/v2/livescores?sport=volleyball",headers={"Authorization":"Bearer "+os.environ["SPORTSAPI_KEY"]})
+          try:
+              with urllib.request.build_opener(NoRedirect()).open(req,timeout=25) as res:
+                  print("HTTP",res.status)
+                  print("Remaining",res.headers.get("ratelimit-remaining"))
+                  rows=json.load(res).get("data",[])
+          except urllib.error.HTTPError as e:
+              raise SystemExit("HTTP "+str(e.code))
+          print("Rows",len(rows))
+          for r in rows[:10]:
+              print(json.dumps({k:r.get(k) for k in ("matchFormat","status","homeScore","awayScore","stale","awarded","finalResultOnly")},ensure_ascii=True))
+          PY
